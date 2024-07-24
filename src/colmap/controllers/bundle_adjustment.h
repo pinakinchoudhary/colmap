@@ -48,4 +48,16 @@ class BundleAdjustmentController : public BaseController {
   std::shared_ptr<Reconstruction> reconstruction_;
 };
 
+class BundleAdjustmentControllerCov : public BaseController {
+ public:
+  BundleAdjustmentControllerCov(const OptionManager& options,
+                             std::shared_ptr<Reconstruction> reconstruction);
+
+  void Run();
+
+ private:
+  const OptionManager options_;
+  std::shared_ptr<Reconstruction> reconstruction_;
+};
+
 }  // namespace colmap

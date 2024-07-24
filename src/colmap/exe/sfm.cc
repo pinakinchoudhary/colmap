@@ -165,6 +165,37 @@ int RunBundleAdjuster(int argc, char** argv) {
   return EXIT_SUCCESS;
 }
 
+int RunBundleAdjusterCov(int argc, char** argv) {
+  std::string input_path;
+  std::string output_path;
+
+  OptionManager options;
+  options.AddRequiredOption("input_path", &input_path);
+  options.AddRequiredOption("output_path", &output_path);
+  options.AddBundleAdjustmentOptions();
+  options.Parse(argc, argv);
+
+  if (!ExistsDir(input_path)) {
+    LOG(ERROR) << "`input_path` is not a directory";
+    return EXIT_FAILURE;
+  }
+
+  if (!ExistsDir(output_path)) {
+    LOG(ERROR) << "`output_path` is not a directory";
+    return EXIT_FAILURE;
+  }
+
+  auto reconstruction = std::make_shared<Reconstruction>();
+  reconstruction->Read(input_path);
+
+  BundleAdjustmentControllerCov ba_controller(options, reconstruction);
+  ba_controller.Run();
+
+  reconstruction->Write(output_path);
+
+  return EXIT_SUCCESS;
+}
+
 int RunColorExtractor(int argc, char** argv) {
   std::string input_path;
   std::string output_path;

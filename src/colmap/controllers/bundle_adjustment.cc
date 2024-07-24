@@ -103,4 +103,46 @@ void BundleAdjustmentController::Run() {
   run_timer.PrintMinutes();
 }
 
+BundleAdjustmentControllerCov::BundleAdjustmentControllerCov(
+    const OptionManager& options,
+    std::shared_ptr<Reconstruction> reconstruction)
+    : options_(options), reconstruction_(std::move(reconstruction)) {}
+
+void BundleAdjustmentControllerCov::Run() {
+  THROW_CHECK_NOTNULL(reconstruction_);
+
+  PrintHeading1("Global bundle adjustment Cov");
+  Timer run_timer;
+  run_timer.Start();
+
+  const std::vector<image_t>& reg_image_ids = reconstruction_->RegImageIds();
+
+  if (reg_image_ids.size() < 2) {
+    LOG(ERROR) << "Need at least two views.";
+    return;
+  }
+
+  // Avoid degeneracies in bundle adjustment.
+  ObservationManager(*reconstruction_).FilterObservationsWithNegativeDepth();
+
+  BundleAdjustmentOptions ba_options = *options_.bundle_adjustment;
+
+  BundleAdjustmentIterationCallback iteration_callback(this);
+  ba_options.solver_options.callbacks.push_back(&iteration_callback);
+
+  // Configure bundle adjustment.
+  BundleAdjustmentConfig ba_config;
+  for (const image_t image_id : reg_image_ids) {
+    ba_config.AddImage(image_id);
+  }
+  ba_config.SetConstantCamPose(reg_image_ids[0]);
+  ba_config.SetConstantCamPositions(reg_image_ids[1], {0});
+
+  // Run bundle adjustment.
+  BundleAdjusterCov bundle_adjuster(ba_options, ba_config);
+  bundle_adjuster.Solve(reconstruction_.get());
+
+  run_timer.PrintMinutes();
+}
+
 }  // namespace colmap

@@ -97,6 +97,7 @@ int main(int argc, char** argv) {
   commands.emplace_back("automatic_reconstructor",
                         &colmap::RunAutomaticReconstructor);
   commands.emplace_back("bundle_adjuster", &colmap::RunBundleAdjuster);
+  commands.emplace_back("bundle_adjuster_cov", &colmap::RunBundleAdjusterCov);
   commands.emplace_back("color_extractor", &colmap::RunColorExtractor);
   commands.emplace_back("database_cleaner", &colmap::RunDatabaseCleaner);
   commands.emplace_back("database_creator", &colmap::RunDatabaseCreator);

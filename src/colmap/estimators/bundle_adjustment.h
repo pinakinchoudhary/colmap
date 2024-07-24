@@ -211,6 +211,52 @@ class BundleAdjuster {
   std::unique_ptr<ceres::LossFunction> loss_function_;
 };
 
+class BundleAdjusterCov {
+ public:
+  BundleAdjusterCov(const BundleAdjustmentOptions& options,
+                 const BundleAdjustmentConfig& config);
+
+  bool Solve(Reconstruction* reconstruction);
+
+  // Set up the problem
+  void SetUpProblem(Reconstruction* reconstruction,
+                    ceres::LossFunction* loss_function);
+  ceres::Solver::Options SetUpSolverOptions(
+      const ceres::Problem& problem,
+      const ceres::Solver::Options& input_solver_options) const;
+
+  // Getter functions below
+  const BundleAdjustmentOptions& Options() const;
+  const BundleAdjustmentConfig& Config() const;
+  // Get the Ceres problem after the last call to "set_up"
+  std::shared_ptr<ceres::Problem> Problem();
+  // Get the Ceres solver summary after the last call to `Solve`.
+  const ceres::Solver::Summary& Summary() const;
+
+ private:
+  void AddImageToProblem(image_t image_id,
+                         Reconstruction* reconstruction,
+                         ceres::LossFunction* loss_function);
+
+  void AddPointToProblem(point3D_t point3D_id,
+                         Reconstruction* reconstruction,
+                         ceres::LossFunction* loss_function);
+
+ protected:
+  void ParameterizeCameras(Reconstruction* reconstruction);
+  void ParameterizePoints(Reconstruction* reconstruction);
+
+  const BundleAdjustmentOptions options_;
+  BundleAdjustmentConfig config_;
+  std::shared_ptr<ceres::Problem> problem_;
+  ceres::Solver::Summary summary_;
+  std::unordered_set<camera_t> camera_ids_;
+  std::unordered_map<point3D_t, size_t> point3D_num_observations_;
+
+  // Hold the life of loss function for Solve()
+  std::unique_ptr<ceres::LossFunction> loss_function_;
+};
+
 class RigBundleAdjuster : public BundleAdjuster {
  public:
   struct Options {

@@ -96,6 +96,52 @@ class ReprojErrorCostFunction {
   const double observed_y_;
 };
 
+// Covariance bundle adjustment cost function for variable
+// camera pose, calibration, and point parameters.
+template <typename CameraModel>
+class ReprojErrorCostFunctionCov {
+ public:
+  explicit ReprojErrorCostFunctionCov(const Eigen::Vector2d& point2D)
+      : observed_x_(point2D(0)), observed_y_(point2D(1)) {}
+
+  static ceres::CostFunction* Create(const Eigen::Vector2d& point2D) {
+    return (
+        new ceres::AutoDiffCostFunction<ReprojErrorCostFunctionCov<CameraModel>,
+                                        2,
+                                        4,
+                                        3,
+                                        3,
+                                        CameraModel::num_params>(
+            new ReprojErrorCostFunctionCov(point2D)));
+  }
+
+  template <typename T>
+  bool operator()(const T* const cam_from_world_rotation,
+                  const T* const cam_from_world_translation,
+                  const T* const point3D,
+                  const T* const camera_params,
+                  T* residuals) const {
+    const Eigen::Matrix<T, 3, 1> point3D_in_cam =
+        EigenQuaternionMap<T>(cam_from_world_rotation) *
+            EigenVector3Map<T>(point3D) +
+        EigenVector3Map<T>(cam_from_world_translation);
+    CameraModel::ImgFromCam(camera_params,
+                            point3D_in_cam[0],
+                            point3D_in_cam[1],
+                            point3D_in_cam[2],
+                            &residuals[0],
+                            &residuals[1]);
+    // DO SOMETHING HERE
+    residuals[0] -= T(observed_x_);
+    residuals[1] -= T(observed_y_);
+    return true;
+  }
+
+ private:
+  const double observed_x_;
+  const double observed_y_;
+};
+
 // Bundle adjustment cost function for variable
 // camera calibration and point parameters, and fixed camera pose.
 template <typename CameraModel>
@@ -116,6 +162,47 @@ class ReprojErrorConstantPoseCostFunction
             3,
             CameraModel::num_params>(
         new ReprojErrorConstantPoseCostFunction(cam_from_world, point2D)));
+  }
+
+  template <typename T>
+  bool operator()(const T* const point3D,
+                  const T* const camera_params,
+                  T* residuals) const {
+    const Eigen::Quaternion<T> cam_from_world_rotation =
+        cam_from_world_.rotation.cast<T>();
+    const Eigen::Matrix<T, 3, 1> cam_from_world_translation =
+        cam_from_world_.translation.cast<T>();
+    return Parent::operator()(cam_from_world_rotation.coeffs().data(),
+                              cam_from_world_translation.data(),
+                              point3D,
+                              camera_params,
+                              residuals);
+  }
+
+ private:
+  const Rigid3d& cam_from_world_;
+};
+
+// Covariance Bundle adjustment cost function for variable
+// camera calibration and point parameters, and fixed camera pose.
+template <typename CameraModel>
+class ReprojErrorConstantPoseCostFunctionCov
+    : public ReprojErrorCostFunctionCov<CameraModel> {
+  using Parent = ReprojErrorCostFunctioCovn<CameraModel>;
+
+ public:
+  ReprojErrorConstantPoseCostFunctionCov(const Rigid3d& cam_from_world,
+                                      const Eigen::Vector2d& point2D)
+      : Parent(point2D), cam_from_world_(cam_from_world) {}
+
+  static ceres::CostFunction* Create(const Rigid3d& cam_from_world,
+                                     const Eigen::Vector2d& point2D) {
+    return (new ceres::AutoDiffCostFunction<
+            ReprojErrorConstantPoseCostFunctionCov<CameraModel>,
+            2,
+            3,
+            CameraModel::num_params>(
+        new ReprojErrorConstantPoseCostFunctionCov(cam_from_world, point2D)));
   }
 
   template <typename T>
