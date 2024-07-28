@@ -36,6 +36,10 @@
 #include "colmap/util/threading.h"
 #include "colmap/util/timer.h"
 
+#include <colmap/feature/types.h> // For FeatureKeypoints & SIFT affine parameters
+#include "colmap/scene/database.h" // For getting FeatureKeypoints & SIFT affine parameters from the database
+
+
 #include <iomanip>
 
 namespace colmap {
@@ -650,9 +654,21 @@ void BundleAdjusterCov::AddImageToProblem(const image_t image_id,
   const bool constant_cam_pose =
       !options_.refine_extrinsics || config_.HasConstantCamPose(image_id);
 
-  // Add residuals to bundle adjustment problem.
+  // cov variation of Adding residuals to bundle adjustment problem.
+  int length = image.Points2D().size();
   size_t num_observations = 0;
-  for (const Point2D& point2D : image.Points2D()) {
+
+  // Load Database
+  const std::string& database_path = "";
+  Database database(database_path);
+
+  // Get the feature keypoints from the database
+  FeatureKeypoints feature_keypoints = database.ReadKeypoints(image_id);
+
+  for (int i = 0; i < length; i++) {
+    Point2D& point2D = image.Points2D()[i];
+    FeatureKeypoint& feature_keypoint = feature_keypoints[i];
+
     if (!point2D.HasPoint3D()) {
       continue;
     }
@@ -663,16 +679,25 @@ void BundleAdjusterCov::AddImageToProblem(const image_t image_id,
     Point3D& point3D = reconstruction->Point3D(point2D.point3D_id);
     assert(point3D.track.Length() > 1);
 
+    // Compute the covariance inv matrix
+    Eigen::Matrix2f cov_inv;
+    
+    float scale = feature_keypoint.ComputeScale();
+    scale = 1/scale;
+
+    cov_inv << scale, 0,
+               0, scale;
+
     if (constant_cam_pose) {
       problem_->AddResidualBlock(
           CameraCostFunction<ReprojErrorConstantPoseCostFunctionCov>(
-              camera.model_id, image.CamFromWorld(), point2D.xy),
+              camera.model_id, image.CamFromWorld(), image.Points2D()[i].xy),
           loss_function,
           point3D.xyz.data(),
           camera_params);
     } else {
       problem_->AddResidualBlock(CameraCostFunction<ReprojErrorCostFunctionCov>(
-                                     camera.model_id, point2D.xy),
+                                     camera.model_id, image.Points2D()[i].xy, cov_inv),
                                  loss_function,
                                  cam_from_world_rotation,
                                  cam_from_world_translation,

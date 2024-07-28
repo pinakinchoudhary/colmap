@@ -57,7 +57,7 @@ template <typename CameraModel>
 class ReprojErrorCostFunction {
  public:
   explicit ReprojErrorCostFunction(const Eigen::Vector2d& point2D)
-      : observed_x_(point2D(0)), observed_y_(point2D(1)) {}
+      : observed_x_(point2D(0)), observed_y_(point2D(1)) {} // cov_11()
 
   static ceres::CostFunction* Create(const Eigen::Vector2d& point2D) {
     return (
@@ -101,10 +101,10 @@ class ReprojErrorCostFunction {
 template <typename CameraModel>
 class ReprojErrorCostFunctionCov {
  public:
-  explicit ReprojErrorCostFunctionCov(const Eigen::Vector2d& point2D)
-      : observed_x_(point2D(0)), observed_y_(point2D(1)) {}
+  explicit ReprojErrorCostFunctionCov(const Eigen::Vector2d& point2D, const Eigen::Matrix2f& cov_inv)
+      : observed_x_(point2D(0)), observed_y_(point2D(1)), c11_(cov_inv(0, 0)), c12_(cov_inv(0, 1)), c21_(cov_inv(1, 0)), c22_(cov_inv(1, 1)) {}  
 
-  static ceres::CostFunction* Create(const Eigen::Vector2d& point2D) {
+  static ceres::CostFunction* Create(const Eigen::Vector2d& point2D, const Eigen::Matrix2f& cov_inv) {
     return (
         new ceres::AutoDiffCostFunction<ReprojErrorCostFunctionCov<CameraModel>,
                                         2,
@@ -112,7 +112,7 @@ class ReprojErrorCostFunctionCov {
                                         3,
                                         3,
                                         CameraModel::num_params>(
-            new ReprojErrorCostFunctionCov(point2D)));
+            new ReprojErrorCostFunctionCov(point2D, cov_inv)));
   }
 
   template <typename T>
@@ -131,15 +131,25 @@ class ReprojErrorCostFunctionCov {
                             point3D_in_cam[2],
                             &residuals[0],
                             &residuals[1]);
-    // DO SOMETHING HERE
     residuals[0] -= T(observed_x_);
     residuals[1] -= T(observed_y_);
+
+    // Multiply residuals by cov_inv matrix
+    T r0 = residuals[0];
+    T r1 = residuals[1];
+    residuals[0] = c11_ * r0 + c12_ * r1;
+    residuals[1] = c21_ * r0 + c22_ * r1;
+
     return true;
   }
 
  private:
   const double observed_x_;
   const double observed_y_;
+  const float c11_;
+  const float c12_;
+  const float c21_;
+  const float c22_;
 };
 
 // Bundle adjustment cost function for variable
@@ -162,47 +172,6 @@ class ReprojErrorConstantPoseCostFunction
             3,
             CameraModel::num_params>(
         new ReprojErrorConstantPoseCostFunction(cam_from_world, point2D)));
-  }
-
-  template <typename T>
-  bool operator()(const T* const point3D,
-                  const T* const camera_params,
-                  T* residuals) const {
-    const Eigen::Quaternion<T> cam_from_world_rotation =
-        cam_from_world_.rotation.cast<T>();
-    const Eigen::Matrix<T, 3, 1> cam_from_world_translation =
-        cam_from_world_.translation.cast<T>();
-    return Parent::operator()(cam_from_world_rotation.coeffs().data(),
-                              cam_from_world_translation.data(),
-                              point3D,
-                              camera_params,
-                              residuals);
-  }
-
- private:
-  const Rigid3d& cam_from_world_;
-};
-
-// Covariance Bundle adjustment cost function for variable
-// camera calibration and point parameters, and fixed camera pose.
-template <typename CameraModel>
-class ReprojErrorConstantPoseCostFunctionCov
-    : public ReprojErrorCostFunctionCov<CameraModel> {
-  using Parent = ReprojErrorCostFunctioCovn<CameraModel>;
-
- public:
-  ReprojErrorConstantPoseCostFunctionCov(const Rigid3d& cam_from_world,
-                                      const Eigen::Vector2d& point2D)
-      : Parent(point2D), cam_from_world_(cam_from_world) {}
-
-  static ceres::CostFunction* Create(const Rigid3d& cam_from_world,
-                                     const Eigen::Vector2d& point2D) {
-    return (new ceres::AutoDiffCostFunction<
-            ReprojErrorConstantPoseCostFunctionCov<CameraModel>,
-            2,
-            3,
-            CameraModel::num_params>(
-        new ReprojErrorConstantPoseCostFunctionCov(cam_from_world, point2D)));
   }
 
   template <typename T>
