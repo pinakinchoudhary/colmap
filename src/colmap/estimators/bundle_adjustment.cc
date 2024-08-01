@@ -534,9 +534,9 @@ void BundleAdjuster::ParameterizePoints(Reconstruction* reconstruction) {
 // BundleAdjusterCov
 ////////////////////////////////////////////////////////////////////////////////
 
-BundleAdjusterCov::BundleAdjusterCov(const BundleAdjustmentOptions& options,
+BundleAdjusterCov::BundleAdjusterCov(const OptionManager& options_cov, const BundleAdjustmentOptions& options,
                                const BundleAdjustmentConfig& config)
-    : options_(options), config_(config) {
+    : options_cov_(options_cov), options_(options), config_(config) {
   THROW_CHECK(options_.Check());
 }
 
@@ -661,7 +661,7 @@ void BundleAdjusterCov::AddImageToProblem(const image_t image_id,
 
   // Load Database
   const std::string& database_path = "";
-  Database database(database_path);
+  Database database(options_cov_.database_path);
 
   // Get the feature keypoints from the database
   FeatureKeypoints feature_keypoints = database.ReadKeypoints(image_id);
@@ -683,11 +683,13 @@ void BundleAdjusterCov::AddImageToProblem(const image_t image_id,
     // Compute the covariance inv matrix
     Eigen::Matrix2f cov_inv;
     
-    float scale = feature_keypoint.ComputeScale();
-    scale = 1/scale;
+    float scale_x = feature_keypoint.ComputeScaleX();
+    float scale_y = feature_keypoint.ComputeScaleY();
+    scale_x = 1/(scale_x);
+    scale_y = 1/(scale_y);
 
-    cov_inv << scale, 0,
-               0, scale;
+    cov_inv << scale_x, 0,
+               0, scale_y;
 
     if (constant_cam_pose) {
       problem_->AddResidualBlock(

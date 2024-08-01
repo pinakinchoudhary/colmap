@@ -213,7 +213,7 @@ class BundleAdjuster {
 
 class BundleAdjusterCov {
  public:
-  BundleAdjusterCov(const BundleAdjustmentOptions& options,
+  BundleAdjusterCov(const OptionManager& options_cov, const BundleAdjustmentOptions& options,
                  const BundleAdjustmentConfig& config);
 
   bool Solve(Reconstruction* reconstruction);
@@ -247,6 +247,7 @@ class BundleAdjusterCov {
   void ParameterizePoints(Reconstruction* reconstruction);
 
   const BundleAdjustmentOptions options_;
+  const OptionManager& options_cov_;
   BundleAdjustmentConfig config_;
   std::shared_ptr<ceres::Problem> problem_;
   ceres::Solver::Summary summary_;

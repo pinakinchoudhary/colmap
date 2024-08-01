@@ -131,7 +131,7 @@ endif()
 
 if(CUDA_ENABLED AND CUDA_FOUND)
     if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-        set(CMAKE_CUDA_ARCHITECTURES "native")
+        set(CMAKE_CUDA_ARCHITECTURES 75)    #made changes from "native" to 75
     endif()
 
     add_definitions("-DCOLMAP_CUDA_ENABLED")

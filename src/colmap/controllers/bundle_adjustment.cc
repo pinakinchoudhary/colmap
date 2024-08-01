@@ -139,7 +139,7 @@ void BundleAdjustmentControllerCov::Run() {
   ba_config.SetConstantCamPositions(reg_image_ids[1], {0});
 
   // Run bundle adjustment.
-  BundleAdjusterCov bundle_adjuster(ba_options, ba_config);
+  BundleAdjusterCov bundle_adjuster(options_, ba_options, ba_config);
   bundle_adjuster.Solve(reconstruction_.get());
 
   run_timer.PrintMinutes();
